@@ -1,4 +1,6 @@
-# DeepDive Application Template
-
-This directory contains a skeleton for a new DeepDive application.
-See [DeepDive's documentation on application layout](http://deepdive.stanford.edu/deepdiveapp) for full detail.
+###
+	Benjamin Lampel, Joel Dick, Wei-Tsung Lin
+	293n DeepDive configuration code for
+	identifying and classifying reddit users
+	who are also university students
+###

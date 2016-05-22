@@ -99,7 +99,7 @@ has_flair(
 	has								bool
 ).
 
-has_flair(author, author_flair_text, if author_flair_text == '' then FALSE else TRUE end) :-
+has_flair(author, author_flair_text, if author_flair_text = "" then FALSE else TRUE end) :-
 	user(author, author_flair_text, _).
 
 #use sentences here to look for certain keywords => student true/false
@@ -185,7 +185,7 @@ is_real(author, author_flair_text) => has_flair(author, author_flair_text, TRUE)
 
 #High upvote bonus:
 @weight(ups)
-is_real(author, author_flair_text, _) :-
-	user(author, author_flair_text),
+is_real(author, author_flair_text) :-
+	user(author, author_flair_text, _),
 	uni_sub_comments(author, author_flair_text, _, _, ups, _, _),
 	user_comments(comment, votes, _, author).
