@@ -1,0 +1,191 @@
+###########################################################
+#			Benjamin Lampel, Joel Dick, Wei-Tsung Lin						#
+#			293n 2016																						#
+#			DDlog file for DeepDive analysis: 									#
+#			rules for determining users from non-users					#
+###########################################################
+
+###########################################################
+#					Relations (Input Data):													#
+#					equivalent to db table													#
+###########################################################
+
+#University subreddit comments ONLY
+@source
+uni_sub_comments(
+	author						text,
+	author_flair_text	text,
+	body							text,
+	score							int,
+	ups								int,
+	controversiality	int,
+	created_utc				int
+).
+
+#Comments by author for author in uni_sub_comments
+@source
+user_comments(
+	comment						text,
+	votes							int,
+	subreddit					text,
+	author						text
+).
+
+###########################################################
+#					Random variable to predict:											#
+#					whether a reddit user is student or not					#
+###########################################################
+
+@extraction
+is_real?(
+	@key
+	@references(relation="user", column="reddit_uname", alias="user")
+	author text,
+	@references(relation="user", column="flair", alias="flair_text")
+	author_flair_text	text
+).
+
+user(
+	@key
+	author								text,
+	author_flair_text			text,
+	body									text
+).
+
+user(author, author_flair_text, body) :-
+	uni_sub_comments(author, author_flair_text, body, _, _, _, _).
+
+###########################################################
+#					NLP Markup:																			#
+#					info about sentence structure										#
+###########################################################
+
+@source
+sentences(
+	@key
+	@distributed_by
+	author					text,
+	@key
+	sentence_index	int,
+	@searchable
+	sentence_text		text,
+	tokens					text[],
+	lemmas					text[],
+	pos_tags				text[],
+	ner_tags				text[],
+	doc_offsets			int[],
+	dep_types				text[],
+	dep_tokens			int[]
+).
+
+function nlp_markup over (
+	author text,
+	body	 text
+) returns rows like sentences
+implementation "udf/nlp_markup.sh" handles tsv lines.
+
+sentences += nlp_markup(author, body) :-
+	uni_sub_comments(author, _, body, _, _, _, _),
+	user_comments(body, _, _, author).
+
+###########################################################
+#					Feature Extraction:															#
+#					finding relevant info in comments								#
+###########################################################
+
+has_flair(
+	author						text,
+	author_flair_text	text,
+	has								bool
+).
+
+has_flair(author, author_flair_text, if author_flair_text == '' then FALSE else TRUE end) :-
+	user(author, author_flair_text, _).
+
+#use sentences here to look for certain keywords => student true/false
+keywords(
+	author	text,
+	body		text,
+	kw			text,
+	index		int,
+	is_kw		int	#-1: false, 1: true
+).
+
+function find_kw over (
+	author 	 text,
+	body	 	 text
+) returns rows like keywords
+implementation "udf/find_kw.py" handles tsv lines.
+
+keywords += find_kw(author, body) :-
+#	user(author, _, _), unnecessary?
+	uni_sub_comments(author, _, body, _, _, _, _).
+#	user_comments(body, _, _, author).
+
+#extract features here 
+@extraction
+kw_feature (
+	@key
+	@references(relation="is_real", column="reddit_uname", alias="is_real")
+	author  text,
+	@key
+	keyword	text,
+	@key
+	feature text
+).
+
+function extract_kw_features over (
+	author		 text,
+	keyword		 text,
+	index			 int,
+	is_kw			 bool,
+	tokens		 text[],
+	lemmas		 text[],
+	pos_tags	 text[],
+	ner_tags	 text[],
+	dep_tokens int[],
+	dep_types	 text[]
+) returns rows like kw_feature
+implementation "udf/extract_kw_features.py" handles tsv lines.
+
+kw_feature += extract_kw_features (
+	author, keyword, index, is_kw, tokens, lemmas,
+	pos_tags,	ner_tags, dep_tokens, dep_types
+) :-
+	keywords(author, _, keyword, index, is_kw),
+	sentences(_, _, _, tokens, lemmas, pos_tags, ner_tags, dep_types, dep_tokens).
+
+#resolve multiple keyword usage
+is_real_resolved(author, author_flair_text, SUM(vote)) :-
+	keywords(author, _, _, _, vote),
+	user(author, author_flair_text, _).
+
+#decide on random variable is_real
+is_real(author, author_flair_text) = if kw > 0 then TRUE
+																else if kw < 0 then FALSE
+																else NULL end :-
+	is_real_resolved(author, author_flair_text, kw).
+
+###########################################################
+#					Inference Rules:																#
+#					weights that help decide if a user is real			#
+###########################################################
+
+#Features:
+@weight(feature)
+is_real(author, author_flair_text) :-
+	user(author, author_flair_text, _),
+	kw_feature(author, _, feature).
+
+#Flair bonus:
+@weight(2.0)
+is_real(author, author_flair_text) => has_flair(author, author_flair_text, TRUE) :-
+	user(author, author_flair_text, _),
+	has_flair(author, author_flair_text, has).
+
+#High upvote bonus:
+@weight(ups)
+is_real(author, author_flair_text, _) :-
+	user(author, author_flair_text),
+	uni_sub_comments(author, author_flair_text, _, _, ups, _, _),
+	user_comments(comment, votes, _, author).
