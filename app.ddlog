@@ -25,10 +25,14 @@ uni_sub_comments(
 #Comments by author for author in uni_sub_comments
 @source
 user_comments(
-	comment						text,
-	votes							int,
+	author						text,
 	subreddit					text,
-	author						text
+  body              text,
+  score             int,
+  ups               int,
+  downs             int,
+  controversiality  int,
+  created_utc       int
 ).
 
 ###########################################################
