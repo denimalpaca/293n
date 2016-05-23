@@ -90,7 +90,7 @@ implementation "udf/nlp_markup.sh" handles tsv lines.
 
 sentences += nlp_markup(author, body) :-
 	uni_sub_comments(author, _, body, _, _, _, _),
-	user_comments(body, _, _, author).
+	user_comments(author, _, body, _, _,  _, _).
 
 ###########################################################
 #					Feature Extraction:															#
@@ -124,7 +124,7 @@ implementation "udf/find_kw.py" handles tsv lines.
 keywords += find_kw(author, body) :-
 #	user(author, _, _), unnecessary?
 	uni_sub_comments(author, _, body, _, _, _, _).
-#	user_comments(body, _, _, author).
+	#user_comments(author, _, body, _, _,  _, _).
 
 #extract features here 
 @extraction
@@ -192,4 +192,4 @@ is_real(author, author_flair_text) => has_flair(author, author_flair_text, TRUE)
 is_real(author, author_flair_text) :-
 	user(author, author_flair_text, _),
 	uni_sub_comments(author, author_flair_text, _, _, ups, _, _),
-	user_comments(comment, votes, _, author).
+	user_comments(author, _, _, _, ups, _, _, _).
