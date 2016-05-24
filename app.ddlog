@@ -2,7 +2,7 @@
 #			Benjamin Lampel, Joel Dick, Wei-Tsung Lin						#
 #			293n 2016																						#
 #			DDlog file for DeepDive analysis: 									#
-#			rules for determining users from non-users					#
+#			rules for determining reddit_users from non-reddit_users					#
 ###########################################################
 
 ###########################################################
@@ -30,33 +30,32 @@ user_comments(
   body              text,
   score             int,
   ups               int,
-  downs             int,
   controversiality  int,
   created_utc       int
 ).
 
 ###########################################################
 #					Random variable to predict:											#
-#					whether a reddit user is student or not					#
+#					whether a reddit reddit_user is student or not					#
 ###########################################################
 
 @extraction
 is_real?(
 	@key
-	@references(relation="user", column="reddit_uname", alias="user")
+	@references(relation="reddit_user", column="reddit_uname", alias="reddit_user")
 	author text,
-	@references(relation="user", column="flair", alias="flair_text")
+	@references(relation="reddit_user", column="flair", alias="flair_text")
 	author_flair_text	text
 ).
 
-user(
+reddit_user(
 	@key
 	author								text,
 	author_flair_text			text,
 	body									text
 ).
 
-user(author, author_flair_text, body) :-
+reddit_user(author, author_flair_text, body) :-
 	uni_sub_comments(author, author_flair_text, body, _, _, _, _).
 
 ###########################################################
@@ -90,7 +89,7 @@ implementation "udf/nlp_markup.sh" handles tsv lines.
 
 sentences += nlp_markup(author, body) :-
 	uni_sub_comments(author, _, body, _, _, _, _),
-	user_comments(author, _, body, _, _,  _, _).
+	user_comments(author, _, body, _,  _, _).
 
 ###########################################################
 #					Feature Extraction:															#
@@ -104,7 +103,7 @@ has_flair(
 ).
 
 has_flair(author, author_flair_text, if author_flair_text = "" then FALSE else TRUE end) :-
-	user(author, author_flair_text, _).
+	reddit_user(author, author_flair_text, _).
 
 #use sentences here to look for certain keywords => student true/false
 keywords(
@@ -122,9 +121,9 @@ function find_kw over (
 implementation "udf/find_kw.py" handles tsv lines.
 
 keywords += find_kw(author, body) :-
-#	user(author, _, _), unnecessary?
+#	reddit_user(author, _, _), unnecessary?
 	uni_sub_comments(author, _, body, _, _, _, _).
-	#user_comments(author, _, body, _, _,  _, _).
+	#user_comments(author, _, body, _,  _, _).
 
 #extract features here 
 @extraction
@@ -162,7 +161,7 @@ kw_feature += extract_kw_features (
 #resolve multiple keyword usage
 is_real_resolved(author, author_flair_text, SUM(vote)) :-
 	keywords(author, _, _, _, vote),
-	user(author, author_flair_text, _).
+	reddit_user(author, author_flair_text, _).
 
 #decide on random variable is_real
 is_real(author, author_flair_text) = if kw > 0 then TRUE
@@ -178,18 +177,18 @@ is_real(author, author_flair_text) = if kw > 0 then TRUE
 #Features:
 @weight(feature)
 is_real(author, author_flair_text) :-
-	user(author, author_flair_text, _),
+	reddit_user(author, author_flair_text, _),
 	kw_feature(author, _, feature).
 
 #Flair bonus:
 @weight(2.0)
 is_real(author, author_flair_text) => has_flair(author, author_flair_text, TRUE) :-
-	user(author, author_flair_text, _),
+	reddit_user(author, author_flair_text, _),
 	has_flair(author, author_flair_text, has).
 
 #High upvote bonus:
 @weight(ups)
 is_real(author, author_flair_text) :-
-	user(author, author_flair_text, _),
+	reddit_user(author, author_flair_text, _),
 	uni_sub_comments(author, author_flair_text, _, _, ups, _, _),
-	user_comments(author, _, _, _, ups, _, _, _).
+	user_comments(author, _, _, _, ups, _, _).

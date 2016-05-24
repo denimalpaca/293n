@@ -15,11 +15,13 @@ def find_kw(
         body         = "text",
     ):
     
-    ddlib.load_dictionary("uni_kws.txt", dict_id="uni_true")
-    ddlib.load_dictionary("non_kws.txt", dict_id="uni_false")
-
-    for i, word in body:
+    uni_true = ddlib.load_dictionary("/home/denimalpaca/Documents/CS/293n/input/uni_kws.txt", dict_id="uni_true")
+    uni_false = ddlib.load_dictionary("/home/denimalpaca/Documents/CS/293n/input/non_kws.txt", dict_id="uni_false")
+    
+    i = 0
+    for word in body:
+        i += 1
         if word in uni_true:
-            yield [author, body, word, i, 1]
+            yield [author, body, word, i-1, 1]
         if word in uni_false:
-            yield [author, body, word, i, -1]
+            yield [author, body, word, i-1, -1]
