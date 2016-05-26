@@ -49,6 +49,7 @@ is_good?(
 reddit_user(
 	@key
 	author text,
+	num_posts int
 ).
 
 reddit_user(author) :-
@@ -71,6 +72,54 @@ implementation "udf/utc_to_hour.py" handles tsv lines.
 
 time_created += utc_to_hour(created_utc) :-
 	uni_sub_comments(created_utc, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _).
+
+
+###########################################################
+#					Distant Supervision:														#
+#					supervised learning from training set						#
+###########################################################
+
+@extraction
+post_label (
+	@key
+	@references(relation="is_good", column="title", alias="is_good")
+	title 						 text,
+	@key
+	@references(relation="is_good", column="author", alias="is_good")
+	author 						 text,
+	@navigable
+	selftext_len			 int,
+	@navigable
+	score_label 			 int,
+	@navigable
+	time_label 				 int,
+	@navigable
+	num_comments_label int,
+	@navigable
+	isself_label  		 int,
+	@navigable
+	thumbnail_label		 int,
+	@navigable
+	rule_id 					 text
+).
+
+#supervision in UDF
+function supervise over (
+	title  			 text,
+	author 			 text,
+	selftext		 text,
+	score	 			 int,
+	time	 			 int,
+	num_comments int,
+	is_self			 bool,
+	thumbnail		 text
+) returns rows like post_label
+implementation "udf/supervise.py" handles tsv lines.
+
+post_label += supervise (
+	title, author, selftext, score, time,
+	num_comments, is_self, thumbnail) :-
+	uni_sub_comments(
 
 ###########################################################
 #					Inference Rules:																#
