@@ -13,180 +13,76 @@
 #University subreddit comments ONLY
 @source
 uni_sub_comments(
+	created_utc				int,
+	subreddit					text,
 	author						text,
-	author_flair_text	text,
-	body							text,
+	domain						text,
+	url								text,
+	num_comments			int,
 	score							int,
 	ups								int,
-	controversiality	int,
-	created_utc				int
-).
-
-#Comments by author for author in uni_sub_comments
-@source
-user_comments(
-	author						text,
-	subreddit					text,
-  body              text,
-  score             int,
-  ups               int,
-  controversiality  int,
-  created_utc       int
+	downs							int,
+	title							text,
+	selftext					text,
+	gilded						int,
+	over_18						bool,
+	thumbnail					text,
+	subreddit_id			text,
+	is_self						bool
 ).
 
 ###########################################################
 #					Random variable to predict:											#
-#					whether a reddit user is student or not					#
+#					whether a reddit post does well on a sub				#
 ###########################################################
 
+#random variable predicts whether the post is "good"
 @extraction
-is_real?(
+is_good?(
+	@key
+	title  text,
 	@key
 	@references(relation="reddit_user", column="reddit_uname", alias="reddit_user")
-	author text,
-	@references(relation="reddit_user", column="flair", alias="author_flair_text")
-	author_flair_text	text
+	author text
 ).
 
 reddit_user(
 	@key
-	author								text,
-	author_flair_text			text,
-	body									text
-).
-
-reddit_user(author, author_flair_text, body) :-
-	uni_sub_comments(author, author_flair_text, body, _, _, _, _).
-
-###########################################################
-#					NLP Markup:																			#
-#					info about sentence structure										#
-###########################################################
-
-@source
-sentences(
-	@key
-	@distributed_by
-	author					text,
-	@key
-	sentence_index	int,
-	@searchable
-	sentence_text		text,
-	tokens					text[],
-	lemmas					text[],
-	pos_tags				text[],
-	ner_tags				text[],
-	doc_offsets			int[],
-	dep_types				text[],
-	dep_tokens			int[]
-).
-
-function nlp_markup over (
 	author text,
-	body	 text
-) returns rows like sentences
-implementation "udf/nlp_markup.sh" handles tsv lines.
+).
 
-sentences += nlp_markup(author, body) :-
-	uni_sub_comments(author, _, body, _, _, _, _),
-	user_comments(author, _, body, _,  _, _).
+reddit_user(author) :-
+	uni_sub_comments(_, _, author, _, _, _, _, _, _, _, _, _, _, _, _, _).
 
 ###########################################################
 #					Feature Extraction:															#
 #					finding relevant info in comments								#
 ###########################################################
 
-has_flair(
-	author						text,
-	author_flair_text	text,
-	has								bool
+#convert time created to an hour in the day, 24h format
+time_created (
+	time int
 ).
 
-has_flair(author, author_flair_text, if author_flair_text = "" then FALSE else TRUE end) :-
-	reddit_user(author, author_flair_text, _).
+function utc_to_hour over (
+	created_utc text
+) returns rows like time_created
+implementation "udf/utc_to_hour.py" handles tsv lines.
 
-#use sentences here to look for certain keywords => student true/false
-keywords(
-	author	text,
-	body		text,
-	kw			text,
-	index		int,
-	is_kw		int	#-1: false, 1: true
-).
-
-function find_kw over (
-	author 	 text,
-	body	 	 text
-) returns rows like keywords
-implementation "udf/find_kw.py" handles tsv lines.
-
-keywords += find_kw(author, body) :-
-	uni_sub_comments(author, _, body, _, _, _, _).
-	#user_comments(author, _, body, _,  _, _).
-
-#extract features here 
-@extraction
-kw_feature (
-	@key
-	@references(relation="is_real", column="reddit_uname", alias="is_real")
-	author  text,
-	@key
-	keyword	text,
-	@key
-	feature text
-).
-
-function extract_kw_features over (
-	author		 text,
-	keyword		 text,
-	index			 int,
-	is_kw			 bool,
-	tokens		 text[],
-	lemmas		 text[],
-	pos_tags	 text[],
-	ner_tags	 text[],
-	dep_tokens int[],
-	dep_types	 text[]
-) returns rows like kw_feature
-implementation "udf/extract_kw_features.py" handles tsv lines.
-
-kw_feature += extract_kw_features (
-	author, keyword, index, is_kw, tokens, lemmas,
-	pos_tags,	ner_tags, dep_tokens, dep_types
-) :-
-	keywords(author, _, keyword, index, is_kw),
-	sentences(_, _, _, tokens, lemmas, pos_tags, ner_tags, dep_types, dep_tokens).
-
-#resolve multiple keyword usage
-is_real_resolved(author, author_flair_text, SUM(vote)) :-
-	keywords(author, _, _, _, vote),
-	reddit_user(author, author_flair_text, _).
-
-#decide on random variable is_real
-is_real(author, author_flair_text) = if kw > 0 then TRUE
-																else if kw < 0 then FALSE
-																else NULL end :-
-	is_real_resolved(author, author_flair_text, kw).
+time_created += utc_to_hour(created_utc) :-
+	uni_sub_comments(created_utc, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _).
 
 ###########################################################
 #					Inference Rules:																#
 #					weights that help decide if a user is real			#
 ###########################################################
 
-#Features:
-@weight(feature)
-is_real(author, author_flair_text) :-
-	reddit_user(author, author_flair_text, _),
-	kw_feature(author, _, feature).
-
-#Flair bonus:
-@weight(2.0)
-is_real(author, author_flair_text) => has_flair(author, author_flair_text, TRUE) :-
-	has_flair(author, author_flair_text, has).
-
-#High upvote bonus:
+#Ups bonus:
 @weight(ups)
-is_real(author, author_flair_text) :-
-	reddit_user(author, author_flair_text, _),
-	uni_sub_comments(author, author_flair_text, _, _, ups, _, _),
-	user_comments(author, _, _, _, ups, _, _).
+is_good(title, author) :-
+	uni_sub_comments(_, _, author, _, _, _, _, ups, _, title, _, _, _, _, _, _).
+
+#Num comments influence:
+@weight(num_comments)
+is_good(title, author) :-
+	uni_sub_comments(_, _, author, _, _, num_comments, _, _, _, title, _, _, _, _, _, _).
