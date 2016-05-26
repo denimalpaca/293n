@@ -2,7 +2,7 @@
 #			Benjamin Lampel, Joel Dick, Wei-Tsung Lin						#
 #			293n 2016																						#
 #			DDlog file for DeepDive analysis: 									#
-#			rules for determining reddit_users from non-reddit_users					#
+#			rules for determining users from non-users					#
 ###########################################################
 
 ###########################################################
@@ -36,7 +36,7 @@ user_comments(
 
 ###########################################################
 #					Random variable to predict:											#
-#					whether a reddit reddit_user is student or not					#
+#					whether a reddit user is student or not					#
 ###########################################################
 
 @extraction
@@ -44,7 +44,7 @@ is_real?(
 	@key
 	@references(relation="reddit_user", column="reddit_uname", alias="reddit_user")
 	author text,
-	@references(relation="reddit_user", column="flair", alias="flair_text")
+	@references(relation="reddit_user", column="flair", alias="author_flair_text")
 	author_flair_text	text
 ).
 
@@ -121,7 +121,6 @@ function find_kw over (
 implementation "udf/find_kw.py" handles tsv lines.
 
 keywords += find_kw(author, body) :-
-#	reddit_user(author, _, _), unnecessary?
 	uni_sub_comments(author, _, body, _, _, _, _).
 	#user_comments(author, _, body, _,  _, _).
 
@@ -183,7 +182,6 @@ is_real(author, author_flair_text) :-
 #Flair bonus:
 @weight(2.0)
 is_real(author, author_flair_text) => has_flair(author, author_flair_text, TRUE) :-
-	reddit_user(author, author_flair_text, _),
 	has_flair(author, author_flair_text, has).
 
 #High upvote bonus:
