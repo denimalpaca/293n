@@ -1,6 +1,14 @@
 import csv
 from datetime import datetime
 
+# Domain Categories
+school_list = {"alumni.berkeley.edu", "blogs.berkeley.edu", "cs.berkeley.edu", "dailycal.org", "eecs.berkeley.edu", "engineering.berkeley.edu", "forage.berkeley.edu", "journalism.berkeley.edu", "news.berkeley.edu", "ocf.berkeley.edu", "police.berkeley.edu"}
+local_list = {"bart.gov", "berkeleybeet.com", "berkeleydailyplanet.com", "berkeleyside.com", "blog.sfgate.com", "californiagoldenblogs.com", "calnature.org", "contracostatimes.com", "eastbayexpress.com", "insidebayarea.com", "mercurynews.com", "sanfrancisco.cbslocal.com", "sfchronicle.com", "sfgate.com"}
+news_list = {"arstechnica.com", "baltimoresun.com", "abc7news.com", "blogs.wsj.com", "bloomberg.com", "espn.go.com", "forbes.com", "fortune.com", "geekwire.com", "huffingtonpost.com", "latimes.com", "npr.org", "nytimes.com", "reuters.com", "washingtonpost.com", "usatoday.com", "theatlantic.com", "theguardian.com"}
+image_list = {"i.imgur.com", "imgur.com"}
+video_list = {"youtu.be", "youtube.com", "vimeo.com"}
+social_list = {"facebook.com", "m.facebook.com", "mobile.twitter.com", "reddit.com", "twitter.com"}
+
 in_file_name = raw_input("Enter file name (.csv): ")
 out_file_name = in_file_name[:-4]+"_out.csv"
 
@@ -10,7 +18,7 @@ ofile = open(out_file_name, 'wb')
 reader = csv.reader(ifile)
 writer = csv.writer(ofile, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
 
-label = ["created_hour","subreddit","author","num_comments","score","title","selftext","author_flair_text"]
+label = ["created_hour","subreddit","author","num_comments","score","title","selftext","gilded","author_flair_text","is_school","is_local","is_news","is_image","is_video","is_social","is_self","is_other"]
 writer.writerow(label)
 
 reader.next()
@@ -40,6 +48,7 @@ for row in reader:
 	title_length = len(title_raw)
 	# 1 is short, 2 is medium, 3 is long
 	# TODO: Change these to appropriate values
+	# Right now inputting raw length so this isn't used.
 	if title_length <= 10:
 		title = 1
 	elif title_length > 10 and title_length <= 25:
@@ -50,6 +59,7 @@ for row in reader:
 	selftext_length = len(selftext_raw)
 	# 1 is short, 2 is medium, 3 is long
 	# TODO: Change these to appropriate values
+	# Right now inputting raw length so this isn't used.
 	if selftext_length <= 10:
 		selftext = 1
 	elif selftext_length > 10 and selftext_length <= 25:
@@ -63,15 +73,51 @@ for row in reader:
 	else:
 		author_flair_text = 1
 
+
+	school = 0
+	local = 0
+	news = 0
+	image = 0
+	video = 0
+	social = 0
+	self = 0
+	other = 0
+
+	if is_self_raw == "true":
+		self = 1
+	elif domain_raw in local_list:
+		local = 1
+	elif domain_raw in news_list:
+		news = 1
+	elif domain_raw in image_list:
+		image = 1
+	elif domain_raw in video_list:
+		video = 1
+	elif domain_raw in social_list:
+		social = 1
+	elif "berkeley.edu" in domain_raw or domain_raw in school_list:
+		school = 1
+	else:
+		other = 1
+
 	out_row = []
 	out_row.append(created_hour)
 	out_row.append(subreddit_raw)
 	out_row.append(author_raw)
 	out_row.append(num_comments_raw)
 	out_row.append(score_raw)
-	out_row.append(title)
-	out_row.append(selftext)
+	out_row.append(title_length)
+	out_row.append(selftext_length)
+	out_row.append(gilded_raw)
 	out_row.append(author_flair_text)
+	out_row.append(school)
+	out_row.append(local)
+	out_row.append(news)
+	out_row.append(image)
+	out_row.append(video)
+	out_row.append(social)
+	out_row.append(self)
+	out_row.append(other)
 	writer.writerow(out_row)
 ifile.close()
 ofile.close()
