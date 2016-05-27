@@ -18,7 +18,7 @@ ofile = open(out_file_name, 'wb')
 reader = csv.reader(ifile)
 writer = csv.writer(ofile, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
 
-label = ["created_hour","subreddit","author","num_comments","score","title","selftext","gilded","author_flair_text","is_school","is_local","is_news","is_image","is_video","is_social","is_self","is_other"]
+label = ["created_hour","subreddit","author","num_comments","score","title","gilded","author_flair_text","is_school","is_local","is_news","is_image","is_video","is_social","is_self","is_other"]
 writer.writerow(label)
 
 reader.next()
@@ -107,7 +107,7 @@ for row in reader:
 	out_row.append(num_comments_raw)
 	out_row.append(score_raw)
 	out_row.append(title_length)
-	out_row.append(selftext_length)
+#	out_row.append(selftext_length)
 	out_row.append(gilded_raw)
 	out_row.append(author_flair_text)
 	out_row.append(school)
